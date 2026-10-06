@@ -2,7 +2,7 @@
 
 ## 目前狀態（2026-10-06）
 
-程式、版型、純音樂與本機預覽已完成，專用公開儲存庫與 Pages 發布來源已建立。LINE 通知憑證與行事曆 ID 已加密存入 GitHub Secrets。Google Calendar API 已啟用；專用服務帳號已有「白凝師大店 預約」的查看活動詳細資料權限。Meta 開發者身分已完成註冊，登入者在白凝商業資產中有完整存取權限。**服務帳號金鑰尚未存入 GitHub Secret，Meta App 與發布憑證尚未完成；每日排程目前已暫停，僅能手動觸發。**此資料夾沒有任何帳密。
+程式、版型、純音樂與本機預覽已完成，專用公開儲存庫與 Pages 發布來源已建立。LINE、行事曆 ID、Google 服務帳號 JSON 已加密存入 GitHub Secrets。Google Calendar API 已啟用；專用服務帳號已有「白凝師大店 預約」的查看活動詳細資料權限。2026-10-06 的 GitHub Actions 乾跑成功，已驗證行事曆讀取、產圖、影片與 Pages 部署，沒有發布 IG。Meta 開發者身分已完成註冊，登入者在白凝商業資產中有完整存取權限。**Meta App 與發布憑證尚未完成；每日排程目前已暫停，僅能手動觸發。**此資料夾沒有任何帳密。
 
 預覽：[sample/story.jpg](sample/story.jpg)、[sample/story.mp4](sample/story.mp4)。預覽中的時段僅供版型測試，不能當作即時空檔發布。
 
@@ -20,10 +20,10 @@
 Ray 已授權建立雲端部署與串接；以下列出完成狀態及啟用前必要步驟。
 
 1. 專用公開 GitHub 儲存庫 [whitening-net-daily-story](https://github.com/rayhuang199601-source/whitening-net-daily-story) 已建立，GitHub Pages 已設定為 GitHub Actions 來源。儲存庫只放本流程的程式與示意預覽；不放顧客資料、憑證或當日預約事件。影片網址會公開，供 Meta 抓取；工作流程內容也會公開。
-2. Google Cloud 專用 service account 與行事曆唯讀分享已完成，Calendar API 已啟用。行事曆 ID 已存入 GitHub Actions secret `CALENDAR_ID`。服務帳號 JSON 金鑰已建立，但尚未存入 `GOOGLE_SERVICE_ACCOUNT_JSON`；自動審查拒絕讓代理透過瀏覽器讀取長期私鑰檔案，應由 Ray 直接在 GitHub Secret 頁貼入 JSON，且不可提交到 Git。
+2. Google Cloud 專用 service account 與行事曆唯讀分享已完成，Calendar API 已啟用。行事曆 ID 與服務帳號 JSON 已分別存入 GitHub Actions secrets `CALENDAR_ID`、`GOOGLE_SERVICE_ACCOUNT_JSON`；金鑰由 Ray 直接貼入 GitHub，未提交到 Git。
 3. 在 Meta for Developers 建立 App，取得 `@wntw_shida` 商業帳號發布所需的權限與 Page access token。必要權限依 Meta 當前審核結果確認，至少包括 `instagram_basic`、`instagram_content_publish`、`pages_show_list`、`pages_read_engagement`。把 token 存 GitHub Actions secret `META_PAGE_ACCESS_TOKEN`；把 IG user ID 設為 variable `META_IG_USER_ID`。任何登入、條款或新權限授予，由 Ray 審核。
 4. 現有白凝 LINE channel token 與 Ray 個人 LINE user ID 已分別放入 Secrets `LINE_CHANNEL_TOKEN`、`LINE_OWNER_USER_ID`，只用於成功、無空檔、失敗通知。
-5. 先透過 `workflow_dispatch` 在非 09:00 時間測試一次，核對可預約時段、影片、音樂、Meta 媒體 ID 與 IG 帳號頁。確認後才保留每日排程。
+5. 已透過 `workflow_dispatch` 的 `dry_run` 模式驗證行事曆、影片與 Pages。待 Meta 發布憑證完成後，再實測限動發布、媒體 ID 與 IG 帳號頁，確認後才啟用每日排程。
 
 ## 安全與維護
 
