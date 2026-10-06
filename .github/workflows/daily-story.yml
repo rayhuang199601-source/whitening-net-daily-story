@@ -1,0 +1,58 @@
+name: 白凝每日可預約限動
+on:
+  schedule:
+    - cron: '50 0 * * *' # 台北 08:50 啟動，程式等到 09:00 才讀取行事曆
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: whitening-story-daily
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/calendar-key.json
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      CALENDAR_ID: ${{ secrets.CALENDAR_ID }}
+      META_PAGE_ACCESS_TOKEN: ${{ secrets.META_PAGE_ACCESS_TOKEN }}
+      META_IG_USER_ID: ${{ vars.META_IG_USER_ID }}
+      LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+      LINE_OWNER_USER_ID: ${{ secrets.LINE_OWNER_USER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-cjk
+      - run: pip install -r requirements.txt
+      - name: Install Calendar credential
+        run: printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > "$GOOGLE_APPLICATION_CREDENTIALS"
+      - id: prepare
+        name: Read calendar and prepare story
+        run: python workflow.py prepare
+      - if: steps.prepare.outputs.publish == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        if: steps.prepare.outputs.publish == 'true'
+        uses: actions/deploy-pages@v4
+      - name: Publish Instagram Story
+        if: steps.prepare.outputs.publish == 'true'
+        env:
+          PAGES_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: python workflow.py publish
+      - name: Remove Calendar credential
+        if: always()
+        run: rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
