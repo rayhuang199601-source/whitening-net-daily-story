@@ -1,6 +1,11 @@
 name: 白凝每日可預約限動
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只驗證行事曆、產圖與 Pages，不發布 IG'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -47,7 +52,7 @@ jobs:
         if: steps.prepare.outputs.publish == 'true'
         uses: actions/deploy-pages@v4
       - name: Publish Instagram Story
-        if: steps.prepare.outputs.publish == 'true'
+        if: steps.prepare.outputs.publish == 'true' && !inputs.dry_run
         env:
           PAGES_BASE_URL: ${{ steps.deployment.outputs.page_url }}
         run: python workflow.py publish
