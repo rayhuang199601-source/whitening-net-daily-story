@@ -1,7 +1,5 @@
 name: 白凝每日可預約限動
 on:
-  schedule:
-    - cron: '50 0 * * *' # 台北 08:50 啟動，程式等到 09:00 才讀取行事曆
   workflow_dispatch:
 
 permissions:
