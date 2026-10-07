@@ -11,10 +11,13 @@ import time
 from pathlib import Path
 
 import requests
+from cryptography.fernet import Fernet
 
 from story import TZ, choose_slots, fetch_events, render, video
 
 TIMEOUT = 30
+TOKEN_STATE = "state/meta-token.json"
+_meta_token: str | None = None
 
 
 def required(name: str) -> str:
@@ -61,6 +64,56 @@ def gh_write(path: str, data: bytes, message: str) -> None:
     response.raise_for_status()
 
 
+def meta_token() -> str:
+    """從加密的續期紀錄讀取權杖；首次執行才讀 GitHub Secret。"""
+    global _meta_token
+    if _meta_token:
+        return _meta_token
+    saved = gh_file(TOKEN_STATE)
+    if saved:
+        record = json.loads(base64.b64decode(saved["content"]))
+        _meta_token = token_cipher().decrypt(
+            record["ciphertext"].encode()).decode()
+    else:
+        _meta_token = required("META_IG_ACCESS_TOKEN")
+    return _meta_token
+
+
+def token_cipher() -> Fernet:
+    """以首次權杖作為加密種子；種子只存在 GitHub Secret。"""
+    seed = required("META_IG_ACCESS_TOKEN").encode()
+    key = hashlib.sha256(b"whitening-net-ig-token-store-v1\0" + seed).digest()
+    return Fernet(base64.urlsafe_b64encode(key))
+
+
+def refresh_meta_token() -> None:
+    """每週續期一次；即使沒有可預約時段也維持權杖有效。"""
+    global _meta_token
+    saved = gh_file(TOKEN_STATE)
+    now = dt.datetime.now(dt.timezone.utc)
+    if saved:
+        record = json.loads(base64.b64decode(saved["content"]))
+        last = dt.datetime.fromisoformat(record["refreshed_at"])
+        if now - last < dt.timedelta(days=7):
+            return
+    else:
+        record = None
+    current = meta_token()
+    if record:
+        response = requests.get("https://graph.instagram.com/refresh_access_token",
+            params={"grant_type": "ig_refresh_token", "access_token": current}, timeout=TIMEOUT)
+        if not response.ok:
+            raise RuntimeError(f"Instagram 權杖續期失敗（HTTP {response.status_code}）")
+        result = response.json()
+        if int(result.get("expires_in", 0)) < 30 * 86400 or not result.get("access_token"):
+            raise RuntimeError("Instagram 權杖續期結果無效")
+        current = result["access_token"]
+    encrypted = token_cipher().encrypt(current.encode()).decode()
+    gh_write(TOKEN_STATE, json.dumps({"ciphertext": encrypted, "refreshed_at": now.isoformat()}).encode(),
+             "Refresh encrypted Instagram access token")
+    _meta_token = current
+
+
 def public_video_url(path: str, expected_size: int) -> str:
     url = required("PAGES_BASE_URL").rstrip("/") + "/" + path
     for _ in range(36):
@@ -77,12 +130,13 @@ def public_video_url(path: str, expected_size: int) -> str:
 
 
 def graph(method: str, path: str, *, data=None, params=None) -> dict:
-    version = os.getenv("META_API_VERSION", "v25.0")
-    response = requests.request(method, f"https://graph.facebook.com/{version}/{path}",
-        headers={"Authorization": f"Bearer {required('META_PAGE_ACCESS_TOKEN')}"},
+    version = os.getenv("META_API_VERSION", "v26.0")
+    response = requests.request(method, f"https://graph.instagram.com/{version}/{path}",
+        headers={"Authorization": f"Bearer {meta_token()}"},
         data=data, params=params, timeout=TIMEOUT)
     if not response.ok:
-        raise RuntimeError(f"Meta API {response.status_code}: {response.text[:400]}")
+        detail = response.text.replace(meta_token(), "[REDACTED]")[:400]
+        raise RuntimeError(f"Meta API {response.status_code}: {detail}")
     return response.json()
 
 
@@ -106,6 +160,8 @@ def prepare() -> None:
         if 0 < wait <= 900:
             time.sleep(wait)
     now = dt.datetime.now(TZ)
+    if os.getenv("DRY_RUN") != "true":
+        refresh_meta_token()
     day = now.date().isoformat()
     state_path = f"state/{day}.json"
     step_output = Path(os.getenv("GITHUB_OUTPUT", "out/step-output.txt"))
