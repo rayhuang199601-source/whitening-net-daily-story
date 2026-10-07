@@ -6,6 +6,10 @@ on:
         description: '只驗證行事曆、產圖與 Pages，不發布 IG'
         type: boolean
         default: false
+      bootstrap_only:
+        description: '只建立 Instagram 長期權杖，不發布 IG'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -28,9 +32,11 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
       CALENDAR_ID: ${{ secrets.CALENDAR_ID }}
-      META_IG_ACCESS_TOKEN: ${{ secrets.META_IG_ACCESS_TOKEN }}
+      META_IG_APP_SECRET: ${{ secrets.META_IG_APP_SECRET }}
+      META_IG_AUTH_CODE: ${{ secrets.META_IG_AUTH_CODE }}
       META_IG_USER_ID: ${{ vars.META_IG_USER_ID }}
       DRY_RUN: ${{ inputs.dry_run }}
+      BOOTSTRAP_ONLY: ${{ inputs.bootstrap_only }}
       LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
       LINE_OWNER_USER_ID: ${{ secrets.LINE_OWNER_USER_ID }}
     steps:
