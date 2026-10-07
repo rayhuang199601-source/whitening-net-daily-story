@@ -65,7 +65,7 @@ def gh_write(path: str, data: bytes, message: str) -> None:
 
 
 def meta_token() -> str:
-    """從加密的續期紀錄讀取權杖；首次執行才讀 GitHub Secret。"""
+    """從加密的續期紀錄讀取權杖。"""
     global _meta_token
     if _meta_token:
         return _meta_token
@@ -75,15 +75,64 @@ def meta_token() -> str:
         _meta_token = token_cipher().decrypt(
             record["ciphertext"].encode()).decode()
     else:
-        _meta_token = required("META_IG_ACCESS_TOKEN")
+        raise RuntimeError("尚未完成 Instagram 首次授權")
     return _meta_token
 
 
 def token_cipher() -> Fernet:
-    """以首次權杖作為加密種子；種子只存在 GitHub Secret。"""
-    seed = required("META_IG_ACCESS_TOKEN").encode()
+    """以 Instagram 應用程式密鑰作為加密種子；密鑰只存在 GitHub Secret。"""
+    seed = required("META_IG_APP_SECRET").encode()
     key = hashlib.sha256(b"whitening-net-ig-token-store-v1\0" + seed).digest()
     return Fernet(base64.urlsafe_b64encode(key))
+
+
+def bootstrap_meta_token() -> None:
+    """用一次性授權碼取得長期權杖；所有權杖只在記憶體中出現。"""
+    global _meta_token
+    if gh_file(TOKEN_STATE):
+        print("Instagram 權杖已建立，略過首次授權")
+        return
+    client_id = "1816798016003875"
+    callback = "https://rayhuang199601-source.github.io/whitening-net-daily-story/"
+    response = requests.post("https://api.instagram.com/oauth/access_token", data={
+        "client_id": client_id,
+        "client_secret": required("META_IG_APP_SECRET"),
+        "grant_type": "authorization_code",
+        "redirect_uri": callback,
+        "code": required("META_IG_AUTH_CODE"),
+    }, timeout=TIMEOUT)
+    if not response.ok:
+        raise RuntimeError(f"Instagram 首次授權失敗（HTTP {response.status_code}）")
+    raw = response.json()
+    if isinstance(raw.get("data"), list) and raw["data"]:
+        raw = raw["data"][0]
+    account = raw.get("user_id")
+    if str(account) != required("META_IG_USER_ID"):
+        raise RuntimeError("Instagram 授權帳號與預定發布帳號不符")
+    permissions = raw.get("permissions", "")
+    granted = set(permissions.split(",") if isinstance(permissions, str) else permissions)
+    expected = {"instagram_business_basic", "instagram_business_content_publish"}
+    if granted and granted != expected:
+        raise RuntimeError("Instagram 授權權限與預期不符")
+    short_token = raw.get("access_token")
+    if not short_token:
+        raise RuntimeError("Instagram 未傳回短期權杖")
+    response = requests.get("https://graph.instagram.com/access_token", params={
+        "grant_type": "ig_exchange_token",
+        "client_secret": required("META_IG_APP_SECRET"),
+        "access_token": short_token,
+    }, timeout=TIMEOUT)
+    if not response.ok:
+        raise RuntimeError(f"Instagram 長期權杖建立失敗（HTTP {response.status_code}）")
+    result = response.json()
+    if int(result.get("expires_in", 0)) < 30 * 86400 or not result.get("access_token"):
+        raise RuntimeError("Instagram 長期權杖結果無效")
+    _meta_token = result["access_token"]
+    encrypted = token_cipher().encrypt(_meta_token.encode()).decode()
+    now = dt.datetime.now(dt.timezone.utc).isoformat()
+    gh_write(TOKEN_STATE, json.dumps({"ciphertext": encrypted, "refreshed_at": now}).encode(),
+             "Store encrypted Instagram access token")
+    print("Instagram 長期權杖已加密儲存")
 
 
 def refresh_meta_token() -> None:
@@ -154,6 +203,12 @@ def publish_story(url: str) -> str:
 
 
 def prepare() -> None:
+    if os.getenv("BOOTSTRAP_ONLY") == "true":
+        bootstrap_meta_token()
+        step_output = Path(os.getenv("GITHUB_OUTPUT", "out/step-output.txt"))
+        step_output.parent.mkdir(parents=True, exist_ok=True)
+        step_output.write_text("publish=false\n")
+        return
     if os.getenv("GITHUB_EVENT_NAME") == "schedule":
         target = dt.datetime.combine(dt.datetime.now(TZ).date(), dt.time(9), TZ)
         wait = (target - dt.datetime.now(TZ)).total_seconds()
