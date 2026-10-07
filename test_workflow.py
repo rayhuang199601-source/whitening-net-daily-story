@@ -22,18 +22,27 @@ class TokenRefreshTest(unittest.TestCase):
     def tearDown(self):
         workflow._meta_token = None
 
-    def test_initial_token_is_stored_only_as_ciphertext(self):
+    def test_bootstrap_exchanges_code_and_stores_only_ciphertext(self):
         writes = []
-        with patch.dict(os.environ, {"META_IG_ACCESS_TOKEN": "initial-secret"}), \
+        short = Mock(ok=True)
+        short.json.return_value = {"access_token": "short-secret", "user_id": "17841475612815491",
+                                   "permissions": "instagram_business_basic,instagram_business_content_publish"}
+        long = Mock(ok=True)
+        long.json.return_value = {"access_token": "long-secret", "expires_in": 60 * 86400}
+        with patch.dict(os.environ, {"META_IG_APP_SECRET": "app-secret", "META_IG_AUTH_CODE": "one-time-code",
+                                  "META_IG_USER_ID": "17841475612815491"}), \
              patch.object(workflow, "gh_file", return_value=None), \
-             patch.object(workflow, "gh_write", side_effect=lambda path, data, message: writes.append((path, data))):
-            workflow.refresh_meta_token()
+             patch.object(workflow, "gh_write", side_effect=lambda path, data, message: writes.append((path, data))), \
+             patch.object(workflow.requests, "post", return_value=short), \
+             patch.object(workflow.requests, "get", return_value=long):
+            workflow.bootstrap_meta_token()
         self.assertEqual(writes[0][0], workflow.TOKEN_STATE)
-        self.assertNotIn(b"initial-secret", writes[0][1])
+        self.assertNotIn(b"long-secret", writes[0][1])
+        self.assertNotIn(b"one-time-code", writes[0][1])
 
     def test_old_token_refreshes_and_remains_encrypted(self):
         old_time = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=8)).isoformat()
-        with patch.dict(os.environ, {"META_IG_ACCESS_TOKEN": "initial-secret"}):
+        with patch.dict(os.environ, {"META_IG_APP_SECRET": "app-secret"}):
             old_ciphertext = workflow.token_cipher().encrypt(b"current-secret").decode()
             saved = {"content": base64.b64encode(json.dumps({
                 "ciphertext": old_ciphertext, "refreshed_at": old_time}).encode()).decode()}
