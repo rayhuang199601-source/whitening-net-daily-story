@@ -34,7 +34,6 @@ jobs:
       CALENDAR_ID: ${{ secrets.CALENDAR_ID }}
       META_IG_APP_SECRET: ${{ secrets.META_IG_APP_SECRET }}
       META_IG_AUTH_CODE: ${{ secrets.META_IG_AUTH_CODE }}
-      META_IG_USER_ID: ${{ vars.META_IG_USER_ID }}
       DRY_RUN: ${{ inputs.dry_run }}
       BOOTSTRAP_ONLY: ${{ inputs.bootstrap_only }}
       LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
