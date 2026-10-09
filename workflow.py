@@ -107,8 +107,8 @@ def bootstrap_meta_token() -> None:
     if isinstance(raw.get("data"), list) and raw["data"]:
         raw = raw["data"][0]
     account = raw.get("user_id")
-    if str(account) != required("META_IG_USER_ID"):
-        raise RuntimeError("Instagram 授權帳號與預定發布帳號不符")
+    if not account or not str(account).isdigit():
+        raise RuntimeError("Instagram 未傳回有效的授權帳號 ID")
     permissions = raw.get("permissions", "")
     granted = set(permissions.split(",") if isinstance(permissions, str) else permissions)
     expected = {"instagram_business_basic", "instagram_business_content_publish"}
@@ -117,6 +117,13 @@ def bootstrap_meta_token() -> None:
     short_token = raw.get("access_token")
     if not short_token:
         raise RuntimeError("Instagram 未傳回短期權杖")
+    profile = requests.get(f"https://graph.instagram.com/v26.0/{account}",
+        headers={"Authorization": f"Bearer {short_token}"},
+        params={"fields": "username"}, timeout=TIMEOUT)
+    if not profile.ok:
+        raise RuntimeError(f"Instagram 授權帳號查核失敗（HTTP {profile.status_code}）")
+    if profile.json().get("username", "").lower() != "wntw_shida":
+        raise RuntimeError("Instagram 授權帳號不是 @wntw_shida")
     response = requests.get("https://graph.instagram.com/access_token", params={
         "grant_type": "ig_exchange_token",
         "client_secret": required("META_IG_APP_SECRET"),
@@ -130,7 +137,8 @@ def bootstrap_meta_token() -> None:
     _meta_token = result["access_token"]
     encrypted = token_cipher().encrypt(_meta_token.encode()).decode()
     now = dt.datetime.now(dt.timezone.utc).isoformat()
-    gh_write(TOKEN_STATE, json.dumps({"ciphertext": encrypted, "refreshed_at": now}).encode(),
+    gh_write(TOKEN_STATE, json.dumps({"ciphertext": encrypted, "refreshed_at": now,
+                                      "user_id": str(account), "username": "wntw_shida"}).encode(),
              "Store encrypted Instagram access token")
     print("Instagram 長期權杖已加密儲存")
 
@@ -158,7 +166,8 @@ def refresh_meta_token() -> None:
             raise RuntimeError("Instagram 權杖續期結果無效")
         current = result["access_token"]
     encrypted = token_cipher().encrypt(current.encode()).decode()
-    gh_write(TOKEN_STATE, json.dumps({"ciphertext": encrypted, "refreshed_at": now.isoformat()}).encode(),
+    gh_write(TOKEN_STATE, json.dumps({**record, "ciphertext": encrypted,
+                                      "refreshed_at": now.isoformat()}).encode(),
              "Refresh encrypted Instagram access token")
     _meta_token = current
 
@@ -190,7 +199,13 @@ def graph(method: str, path: str, *, data=None, params=None) -> dict:
 
 
 def publish_story(url: str) -> str:
-    user = required("META_IG_USER_ID")
+    saved = gh_file(TOKEN_STATE)
+    if not saved:
+        raise RuntimeError("尚未完成 Instagram 首次授權")
+    identity = json.loads(base64.b64decode(saved["content"]))
+    if identity.get("username") != "wntw_shida" or not str(identity.get("user_id", "")).isdigit():
+        raise RuntimeError("Instagram 授權帳號紀錄無效")
+    user = identity["user_id"]
     container = graph("POST", f"{user}/media", data={"media_type": "STORIES", "video_url": url})["id"]
     for _ in range(30):
         status = graph("GET", container, params={"fields": "status_code,status"})
