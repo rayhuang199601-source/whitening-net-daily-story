@@ -1,8 +1,8 @@
 # 白凝每日雲端限動發布流程
 
-## 目前狀態（2026-10-07）
+## 目前狀態（2026-10-09）
 
-程式、版型、純音樂與本機預覽已完成，專用公開儲存庫與 Pages 發布來源已建立。LINE、行事曆 ID、Google 服務帳號 JSON 已加密存入 GitHub Secrets。Google Calendar API 已啟用；專用服務帳號已有「白凝師大店 預約」的查看活動詳細資料權限。2026-10-07 的 GitHub Actions 乾跑成功，已驗證行事曆讀取、產圖、影片與 Pages 部署，沒有發布 IG。Meta App 已建立，`@wntw_shida` 已接受測試邀請，Instagram 帳號 ID 已存入 GitHub variable。**Instagram 權杖尚未產生；每日排程目前已暫停，僅能手動觸發。**此資料夾沒有任何帳密。
+程式、版型、純音樂與本機預覽已完成，專用公開儲存庫與 Pages 發布來源已建立。LINE、行事曆 ID、Google 服務帳號 JSON 已加密存入 GitHub Secrets。Google Calendar API 已啟用；專用服務帳號已有「白凝師大店 預約」的查看活動詳細資料權限。2026-10-07 的 GitHub Actions 乾跑成功，已驗證行事曆讀取、產圖、影片與 Pages 部署，沒有發布 IG。Meta App 已建立，`@wntw_shida` 已接受測試邀請。10/09 首次權杖交換發現 Facebook 登入所得帳號 ID 與 Instagram 登入所得 ID 不同；程式已改為以 Instagram API 驗證帳號名稱，並保存這次登入所得 ID。本機 5 項測試通過。原一次性授權碼已用過，待重新授權後再交換。**Instagram 長期權杖尚未產生；每日排程目前暫停，僅能手動觸發。**此資料夾沒有任何帳密。
 
 預覽：[sample/story.jpg](sample/story.jpg)、[sample/story.mp4](sample/story.mp4)。預覽中的時段僅供版型測試，不能當作即時空檔發布。
 
@@ -21,7 +21,7 @@ Ray 已授權建立雲端部署與串接；以下列出完成狀態及啟用前�
 
 1. 專用公開 GitHub 儲存庫 [whitening-net-daily-story](https://github.com/rayhuang199601-source/whitening-net-daily-story) 已建立，GitHub Pages 已設定為 GitHub Actions 來源。儲存庫只放本流程的程式與示意預覽；不放顧客資料、憑證或當日預約事件。影片網址會公開，供 Meta 抓取；工作流程內容也會公開。
 2. Google Cloud 專用 service account 與行事曆唯讀分享已完成，Calendar API 已啟用。行事曆 ID 與服務帳號 JSON 已分別存入 GitHub Actions secrets `CALENDAR_ID`、`GOOGLE_SERVICE_ACCOUNT_JSON`；金鑰由 Ray 直接貼入 GitHub，未提交到 Git。
-3. Meta App `Whitening Net Daily Story` 已建立並綁定白凝商業資產；採用 Instagram 登入 API，只加入 `instagram_business_basic` 與 `instagram_business_content_publish` 兩項權限。`@wntw_shida` 已接受測試邀請，IG user ID 已存入 variable `META_IG_USER_ID`。Meta 預設產生的登入網址要求了額外的私訊、留言和洞察權限，因此改用官方文件允許的自訂 OAuth 網址，只要求上述兩項權限。Ray 需完成 Instagram 登入與授權，並把一次性授權碼存入 GitHub Secret `META_IG_AUTH_CODE`、Instagram 應用程式密鑰存入 `META_IG_APP_SECRET`。接著以 `bootstrap_only` 手動執行一次工作流程，將授權碼換成 60 天權杖並加密保存。完成後可刪除一次性授權碼 Secret。任何登入、條款或新權限授予，由 Ray 審核。
+3. Meta App `Whitening Net Daily Story` 已建立並綁定白凝商業資產；採用 Instagram 登入 API，只加入 `instagram_business_basic` 與 `instagram_business_content_publish` 兩項權限。`@wntw_shida` 已接受測試邀請。Meta 預設產生的登入網址要求了額外的私訊、留言和洞察權限，因此改用官方文件允許的自訂 OAuth 網址，只要求上述兩項權限。Instagram 應用程式密鑰已存 GitHub Secret `META_IG_APP_SECRET`。待 Ray 完成重新登入與授權，把新的一次性授權碼更新至 GitHub Secret `META_IG_AUTH_CODE`，再以 `bootstrap_only` 手動執行一次工作流程，將授權碼換成 60 天權杖並加密保存。程式會透過 Instagram API 確認帳號名稱為 `@wntw_shida`，使用 Instagram 登入所得 ID 發布。完成後可刪除一次性授權碼 Secret。任何登入、條款或新權限授予，由 Ray 審核。
 4. 現有白凝 LINE channel token 與 Ray 個人 LINE user ID 已分別放入 Secrets `LINE_CHANNEL_TOKEN`、`LINE_OWNER_USER_ID`，只用於成功、無空檔、失敗通知。
 5. 已透過 `workflow_dispatch` 的 `dry_run` 模式驗證行事曆、影片與 Pages。待 Meta 發布憑證完成後，再實測限動發布、媒體 ID 與 IG 帳號頁，確認後才啟用每日排程。
 
