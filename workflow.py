@@ -110,7 +110,7 @@ def bootstrap_meta_token() -> None:
     if not account or not str(account).isdigit():
         raise RuntimeError("Instagram 未傳回有效的授權帳號 ID")
     permissions = raw.get("permissions", "")
-    granted = set(permissions.split(",") if isinstance(permissions, str) else permissions)
+    granted = {p for p in (permissions.split(",") if isinstance(permissions, str) else permissions) if p}
     expected = {"instagram_business_basic", "instagram_business_content_publish"}
     if granted and granted != expected:
         raise RuntimeError("Instagram 授權權限與預期不符")
