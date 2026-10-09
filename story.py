@@ -15,7 +15,7 @@ import wave
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 
 TZ = ZoneInfo("Asia/Taipei")
 AVAIL_TITLE = "牙齒淨白_可預約"
@@ -93,41 +93,77 @@ def text_font(size: int) -> ImageFont.FreeTypeFont:
     raise FileNotFoundError("缺少繁體中文字型，請提供 NotoSansTC-Regular.otf")
 
 
+def serif_font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont:
+    candidates = [(Path("/usr/share/fonts/opentype/noto/" +
+                        ("NotoSerifCJK-Bold.ttc" if bold else "NotoSerifCJK-Regular.ttc")), 3),
+                  (Path("/System/Library/Fonts/Supplemental/Songti.ttc"), 2 if bold else 7)]
+    for path, index in candidates:
+        if path.exists():
+            return ImageFont.truetype(str(path), size, index=index)
+    return text_font(size)
+
+
 def render(slots: list[dict], path: Path) -> None:
-    image = Image.new("RGB", (W, H), "#f6f4f0")
-    draw = ImageDraw.Draw(image)
     photo_path = Path(__file__).parent / "brand_photo.jpg"
     if photo_path.exists():
-        source = Image.open(photo_path).convert("RGB")
-        scale = max(W / source.width, 870 / source.height)
-        source = source.resize((round(source.width * scale), round(source.height * scale)))
-        x = (source.width - W) // 2
-        source = source.crop((x, 0, x + W, 870))
-        image.paste(source, (0, 0))
-        overlay = Image.new("RGBA", (W, 870), (248, 247, 244, 85))
-        image.paste(overlay, (0, 0), overlay)
-        draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((52, 70, 690, 200), radius=42, fill="#e4ebf0")
-    draw.text((88, 100), "WHITE NING NET", font=text_font(40), fill="#5c7994")
-    draw.text((70, 238), "近期可預約時段", font=text_font(83), fill="#303743")
-    draw.text((72, 355), "留一點時間給自己，從微笑開始", font=text_font(39), fill="#52606c")
-    draw.rounded_rectangle((48, 510, 1032, 1620), radius=48, fill="#fffdf9", outline="#d4dfe8", width=3)
-    top = 560
+        with Image.open(photo_path) as source:
+            image = ImageOps.fit(source.convert("RGB"), (W, H), method=Image.Resampling.LANCZOS)
+    else:
+        image = Image.new("RGB", (W, H), "#f6f4f0")
+    image = image.convert("RGBA")
+    ink, blue = "#324455", "#819eb5"
+    draw = ImageDraw.Draw(image)
+
+    # 影像只提供氛圍；日期、時段和品牌字均由程式精確排版。
+    draw.text((78, 117), "Good Morning!", font=serif_font(45), fill=blue)
+    draw.text((68, 235), "近期可", font=serif_font(105, bold=True), fill=ink)
+    draw.text((68, 350), "預約時段", font=serif_font(105, bold=True), fill=ink)
+    draw.arc((96, 493, 540, 585), 190, 350, fill=blue, width=4)
+    draw.text((79, 548), "留一點時間給自己，", font=serif_font(37), fill=ink)
+    draw.text((79, 605), "從容整理笑容", font=serif_font(37), fill=ink)
+
+    card_top, row_height = 770, 213
+    card_bottom = card_top + 55 + row_height * len(slots)
+    shadow = Image.new("RGBA", (W, H))
+    ImageDraw.Draw(shadow).rounded_rectangle((55, card_top + 15, 1030, card_bottom + 15),
+        radius=48, fill=(48, 61, 75, 65))
+    image = Image.alpha_composite(image, shadow.filter(ImageFilter.GaussianBlur(25)))
+    panel = Image.new("RGBA", (W, H))
+    panel_draw = ImageDraw.Draw(panel)
+    panel_draw.rounded_rectangle((45, card_top, 1035, card_bottom), radius=48,
+        fill=(255, 254, 251, 246), outline=(224, 229, 231, 255), width=2)
+    image = Image.alpha_composite(image, panel)
+    draw = ImageDraw.Draw(image)
+
     for i, row in enumerate(slots):
         date = dt.date.fromisoformat(row["date"])
-        label = f"{date.month}/{date.day}（{WEEKDAYS[date.weekday()]}）"
-        draw.text((95, top), label, font=text_font(58), fill="#364556")
+        center_y = card_top + 148 + i * row_height
+        draw.ellipse((105, center_y - 87, 279, center_y + 87), fill="#e6edf2")
+        draw.text((192, center_y - 30), f"{date.month}/{date.day}",
+                  font=serif_font(58), fill=ink, anchor="mm")
+        draw.text((192, center_y + 43), f"（{WEEKDAYS[date.weekday()]}）",
+                  font=serif_font(36), fill=ink, anchor="mm")
+        draw.line((330, center_y - 74, 330, center_y + 74), fill="#a8bccb", width=2)
         hours = row["hours"]
-        for j in range(0, len(hours), 4):
-            draw.text((100, top + 94 + (j // 4) * 57), "  ·  ".join(hours[j:j+4]), font=text_font(40), fill="#3c4e60")
-        if i < len(slots)-1:
-            draw.line((90, top + 310, 990, top + 310), fill="#dbe3e9", width=3)
-        top += 350
-    draw.rounded_rectangle((155, 1690, 925, 1800), radius=54, fill="#8ca9bd")
-    draw.text((360, 1714), "歡迎私訊預約", font=text_font(47), fill="#ffffff")
-    draw.text((252, 1840), "白凝｜美齒計畫  台北師大店", font=text_font(34), fill="#617a8c")
+        columns = 5 if len(hours) > 12 else 4
+        line_count = math.ceil(len(hours) / columns)
+        first_y = center_y - (line_count - 1) * 26
+        for j, hour in enumerate(hours):
+            x = 386 + (j % columns) * (121 if columns == 5 else 149)
+            y = first_y + (j // columns) * 52
+            draw.text((x, y), hour, font=serif_font(35), fill=ink, anchor="lm")
+        if i < len(slots) - 1:
+            y = center_y + 108
+            draw.line((83, y, 995, y), fill="#e0e4e7", width=2)
+
+    draw.rounded_rectangle((220, 1550, 860, 1660), radius=55, fill="#8caabd")
+    draw.text((540, 1604), "歡迎私訊預約  ›", font=serif_font(52), fill="#ffffff", anchor="mm")
+    draw.text((540, 1704), "實際時段以私訊確認為準", font=serif_font(29), fill=ink, anchor="mm")
+    draw.line((270, 1754, 810, 1754), fill="#a2b5c4", width=2)
+    draw.text((540, 1812), "WHITENING NET", font=serif_font(47), fill=ink, anchor="mm")
+    draw.text((540, 1861), "白凝｜美齒計畫  台北師大店", font=serif_font(30), fill=ink, anchor="mm")
     path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path, quality=94)
+    image.convert("RGB").save(path, quality=94)
 
 
 def synth_music(path: Path, seconds=8) -> None:
