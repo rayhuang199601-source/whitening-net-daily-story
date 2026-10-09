@@ -1,5 +1,7 @@
 name: 白凝每日可預約限動
 on:
+  schedule:
+    - cron: '50 0 * * *' # 台北時間 08:50 觸發；程式等待至 09:00 讀取行事曆
   workflow_dispatch:
     inputs:
       dry_run:
