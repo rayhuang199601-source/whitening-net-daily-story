@@ -28,11 +28,11 @@ class SlotRulesTest(unittest.TestCase):
         slots = choose_slots(events, dt.datetime(2026, 10, 7, 15, 30, tzinfo=TZ))
         self.assertEqual(slots[0]["hours"], ["16:00"])
 
-    def test_five_tracks_rotate_by_taipei_day(self):
+    def test_three_japanese_tracks_rotate_by_taipei_day(self):
         days = [dt.date(2026, 10, 11) + dt.timedelta(days=offset) for offset in range(6)]
         self.assertEqual([music_for_day(day).name for day in days],
-                         ["track_01.mp3", "track_02.mp3", "track_03.mp3", "track_04.mp3",
-                          "track_05.mp3", "track_01.mp3"])
+                         ["track_jp_01.mp3", "track_jp_02.mp3", "track_jp_03.mp3",
+                          "track_jp_01.mp3", "track_jp_02.mp3", "track_jp_03.mp3"])
 
 
 if __name__ == "__main__":

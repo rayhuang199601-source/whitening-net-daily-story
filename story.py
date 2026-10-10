@@ -21,7 +21,7 @@ FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
 W, H = 1080, 1920
 WEEKDAYS = "一二三四五六日"
 MUSIC_START_DATE = dt.date(2026, 10, 11)
-MUSIC_FILES = tuple(Path(__file__).parent / "music" / f"track_{number:02d}.mp3" for number in range(1, 6))
+MUSIC_FILES = tuple(Path(__file__).parent / "music" / "japanese" / f"track_jp_{number:02d}.mp3" for number in range(1, 4))
 
 
 def choose_slots(events: list[dict], now: dt.datetime, days=3, lookahead=21) -> list[dict]:
@@ -167,7 +167,7 @@ def render(slots: list[dict], path: Path) -> None:
 
 
 def music_for_day(day: dt.date) -> Path:
-    """同一天固定用同一首；每天依序輪替五首。"""
+    """同一天固定用同一首；每天依序輪替三首日系配樂。"""
     return MUSIC_FILES[(day - MUSIC_START_DATE).days % len(MUSIC_FILES)]
 
 
