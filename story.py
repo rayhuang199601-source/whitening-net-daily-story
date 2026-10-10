@@ -1,4 +1,4 @@
-"""白凝每日可預約限動：讀取、排版與合成原創純音樂。
+"""白凝每日可預約限動：讀取、排版與合成品牌配樂。
 
 執行：python story.py --sample（本機預覽）；正式發布入口見 workflow.py。
 """
@@ -9,9 +9,7 @@ import datetime as dt
 import math
 import json
 import os
-import struct
 import subprocess
-import wave
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -166,33 +164,13 @@ def render(slots: list[dict], path: Path) -> None:
     image.convert("RGB").save(path, quality=94)
 
 
-def synth_music(path: Path, seconds=8) -> None:
-    """自行合成柔和明亮的四小節純音樂，不使用受版權保護的錄音。"""
-    rate = 24000
-    chords = [(261.63, 329.63, 392.00), (220.00, 329.63, 440.00),
-              (174.61, 261.63, 349.23), (196.00, 293.66, 392.00)]
-    with wave.open(str(path), "wb") as file:
-        file.setnchannels(1); file.setsampwidth(2); file.setframerate(rate)
-        frames = bytearray()
-        for n in range(rate * seconds):
-            t = n / rate
-            chord = chords[min(int(t // 2), 3)]
-            local = t % 2
-            envelope = min(local / .25, 1, (2 - local) / .28)
-            tone = sum(math.sin(2 * math.pi * f * t) for f in chord) / 3
-            sparkle = math.sin(2 * math.pi * chord[2] * 2 * t) * .09
-            sample = max(-1, min(1, (tone * .25 + sparkle) * envelope))
-            frames += struct.pack("<h", round(sample * 32767))
-        file.writeframes(frames)
-
-
 def video(image: Path, output: Path) -> None:
-    music = output.with_suffix(".wav")
-    synth_music(music)
+    music = Path(__file__).parent / "brand_music.mp3"
+    if not music.is_file():
+        raise FileNotFoundError(f"缺少品牌配樂：{music}")
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-framerate", "25",
                     "-i", str(image), "-i", str(music), "-t", "8", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                     "-r", "25", "-c:a", "aac", "-ar", "48000", "-b:a", "128k", "-movflags", "+faststart", str(output)], check=True)
-    music.unlink()
 
 
 def main() -> None:
