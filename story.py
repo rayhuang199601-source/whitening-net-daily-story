@@ -20,6 +20,8 @@ AVAIL_TITLE = "牙齒淨白_可預約"
 FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
 W, H = 1080, 1920
 WEEKDAYS = "一二三四五六日"
+MUSIC_START_DATE = dt.date(2026, 10, 11)
+MUSIC_FILES = tuple(Path(__file__).parent / "music" / f"track_{number:02d}.mp3" for number in range(1, 6))
 
 
 def choose_slots(events: list[dict], now: dt.datetime, days=3, lookahead=21) -> list[dict]:
@@ -164,13 +166,19 @@ def render(slots: list[dict], path: Path) -> None:
     image.convert("RGB").save(path, quality=94)
 
 
-def video(image: Path, output: Path) -> None:
-    music = Path(__file__).parent / "brand_music.mp3"
+def music_for_day(day: dt.date) -> Path:
+    """同一天固定用同一首；每天依序輪替五首。"""
+    return MUSIC_FILES[(day - MUSIC_START_DATE).days % len(MUSIC_FILES)]
+
+
+def video(image: Path, output: Path, day: dt.date | None = None) -> Path:
+    music = music_for_day(day or dt.datetime.now(TZ).date())
     if not music.is_file():
         raise FileNotFoundError(f"缺少品牌配樂：{music}")
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-framerate", "25",
                     "-i", str(image), "-i", str(music), "-t", "8", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                     "-r", "25", "-c:a", "aac", "-ar", "48000", "-b:a", "128k", "-movflags", "+faststart", str(output)], check=True)
+    return music
 
 
 def main() -> None:

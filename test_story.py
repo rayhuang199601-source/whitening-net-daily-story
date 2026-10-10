@@ -1,7 +1,7 @@
 import datetime as dt
 import unittest
 
-from story import TZ, choose_slots
+from story import TZ, choose_slots, music_for_day
 
 
 def event(title, date, start, end):
@@ -27,6 +27,12 @@ class SlotRulesTest(unittest.TestCase):
         events = [event("牙齒淨白_可預約", "2026-10-07", "14:30", "17:00")]
         slots = choose_slots(events, dt.datetime(2026, 10, 7, 15, 30, tzinfo=TZ))
         self.assertEqual(slots[0]["hours"], ["16:00"])
+
+    def test_five_tracks_rotate_by_taipei_day(self):
+        days = [dt.date(2026, 10, 11) + dt.timedelta(days=offset) for offset in range(6)]
+        self.assertEqual([music_for_day(day).name for day in days],
+                         ["track_01.mp3", "track_02.mp3", "track_03.mp3", "track_04.mp3",
+                          "track_05.mp3", "track_01.mp3"])
 
 
 if __name__ == "__main__":

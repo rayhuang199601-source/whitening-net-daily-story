@@ -252,13 +252,14 @@ def prepare() -> None:
     output = Path("out")
     output.mkdir(exist_ok=True)
     render(slots, output / "story.jpg")
-    video(output / "story.jpg", output / "story.mp4")
+    music = video(output / "story.jpg", output / "story.mp4", now.date())
     content = (output / "story.mp4").read_bytes()
     video_path = f"story/{day}_{hashlib.sha256(content).hexdigest()[:12]}.mp4"
     destination = Path("site") / video_path
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(content)
-    (output / "manifest.json").write_text(json.dumps({"slots": slots, "path": video_path, "size": len(content)}, ensure_ascii=False))
+    (output / "manifest.json").write_text(json.dumps({"slots": slots, "path": video_path,
+                                                        "size": len(content), "music": music.name}, ensure_ascii=False))
     step_output.write_text("publish=true\n")
 
 
@@ -280,10 +281,12 @@ def publish() -> None:
         supersedes = json.loads(base64.b64decode(previous["content"])).get("media_id")
     # 先記「待查」，中斷後重跑也不會重複發布；失敗需人工查核帳號狀態。
     gh_write(state_path, json.dumps({"status": "pending", "slots": slots, "video": url,
+                                     "music": manifest["music"],
                                      "supersedes_media_id": supersedes}, ensure_ascii=False).encode(),
              f"Mark White Ning Story pending {day}")
     media_id = publish_story(url)
     gh_write(state_path, json.dumps({"status": "published", "slots": slots, "media_id": media_id,
+                                     "music": manifest["music"],
                                      "supersedes_media_id": supersedes}, ensure_ascii=False).encode(),
              f"Mark White Ning Story published {day}")
     notify(f"【白凝限動】{day} 已發布至 @wntw_shida，限動媒體 ID：{media_id}。")
