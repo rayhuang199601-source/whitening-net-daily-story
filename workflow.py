@@ -64,6 +64,10 @@ def gh_write(path: str, data: bytes, message: str) -> None:
     response.raise_for_status()
 
 
+def manual_repost_enabled() -> bool:
+    return os.getenv("GITHUB_EVENT_NAME") == "workflow_dispatch" and os.getenv("FORCE_REPOST") == "true"
+
+
 def meta_token() -> str:
     """從加密的續期紀錄讀取權杖。"""
     global _meta_token
@@ -236,7 +240,7 @@ def prepare() -> None:
     state_path = f"state/{day}.json"
     step_output = Path(os.getenv("GITHUB_OUTPUT", "out/step-output.txt"))
     step_output.parent.mkdir(parents=True, exist_ok=True)
-    if gh_file(state_path):
+    if gh_file(state_path) and not manual_repost_enabled():
         print("本日已有發布紀錄或待查狀態，避免重複發布")
         step_output.write_text("publish=false\n")
         return
@@ -268,11 +272,19 @@ def publish() -> None:
         return
     url = public_video_url(manifest["path"], manifest["size"])
     state_path = f"state/{day}.json"
+    previous = gh_file(state_path)
+    supersedes = None
+    if previous:
+        if not manual_repost_enabled():
+            raise RuntimeError("今日已有發布紀錄；只能透過手動重發選項覆寫")
+        supersedes = json.loads(base64.b64decode(previous["content"])).get("media_id")
     # 先記「待查」，中斷後重跑也不會重複發布；失敗需人工查核帳號狀態。
-    gh_write(state_path, json.dumps({"status": "pending", "slots": slots, "video": url}, ensure_ascii=False).encode(),
+    gh_write(state_path, json.dumps({"status": "pending", "slots": slots, "video": url,
+                                     "supersedes_media_id": supersedes}, ensure_ascii=False).encode(),
              f"Mark White Ning Story pending {day}")
     media_id = publish_story(url)
-    gh_write(state_path, json.dumps({"status": "published", "slots": slots, "media_id": media_id}, ensure_ascii=False).encode(),
+    gh_write(state_path, json.dumps({"status": "published", "slots": slots, "media_id": media_id,
+                                     "supersedes_media_id": supersedes}, ensure_ascii=False).encode(),
              f"Mark White Ning Story published {day}")
     notify(f"【白凝限動】{day} 已發布至 @wntw_shida，限動媒體 ID：{media_id}。")
 

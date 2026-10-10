@@ -75,7 +75,15 @@ class TokenRefreshTest(unittest.TestCase):
             self.assertNotIn(b"next-secret", writes[0])
             record = json.loads(writes[0])
             self.assertEqual(workflow.token_cipher().decrypt(record["ciphertext"].encode()), b"next-secret")
-            self.assertEqual(record["user_id"], "2468013579")
+        self.assertEqual(record["user_id"], "2468013579")
+
+
+class RepostGuardTest(unittest.TestCase):
+    def test_repost_requires_explicit_manual_dispatch(self):
+        with patch.dict(os.environ, {"GITHUB_EVENT_NAME": "schedule", "FORCE_REPOST": "true"}):
+            self.assertFalse(workflow.manual_repost_enabled())
+        with patch.dict(os.environ, {"GITHUB_EVENT_NAME": "workflow_dispatch", "FORCE_REPOST": "true"}):
+            self.assertTrue(workflow.manual_repost_enabled())
 
 
 if __name__ == "__main__":

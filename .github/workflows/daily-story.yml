@@ -12,6 +12,10 @@ on:
         description: '只建立 Instagram 長期權杖，不發布 IG'
         type: boolean
         default: false
+      force_repost:
+        description: '確認舊限動已刪除後，允許手動重發今日限動'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -38,6 +42,7 @@ jobs:
       META_IG_AUTH_CODE: ${{ secrets.META_IG_AUTH_CODE }}
       DRY_RUN: ${{ inputs.dry_run }}
       BOOTSTRAP_ONLY: ${{ inputs.bootstrap_only }}
+      FORCE_REPOST: ${{ inputs.force_repost }}
       LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
       LINE_OWNER_USER_ID: ${{ secrets.LINE_OWNER_USER_ID }}
     steps:
