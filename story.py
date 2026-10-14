@@ -22,6 +22,14 @@ W, H = 1080, 1920
 WEEKDAYS = "一二三四五六日"
 MUSIC_START_DATE = dt.date(2026, 10, 11)
 MUSIC_FILES = tuple(Path(__file__).parent / "music" / "japanese" / f"track_jp_{number:02d}.mp3" for number in range(1, 4))
+TABLETOP_START_DATE = dt.date(2026, 10, 15)
+
+
+def layout_for_day(day: dt.date) -> str:
+    """10/15 起桌面版、原版逐日交替；跳過發布仍依日期推進。"""
+    if day >= TABLETOP_START_DATE and (day - TABLETOP_START_DATE).days % 2 == 0:
+        return "tabletop"
+    return "classic"
 
 
 def choose_slots(events: list[dict], now: dt.datetime, days=3, lookahead=21) -> list[dict]:
@@ -103,7 +111,7 @@ def serif_font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont:
     return text_font(size)
 
 
-def render(slots: list[dict], path: Path) -> None:
+def render_classic(slots: list[dict], path: Path) -> None:
     photo_path = Path(__file__).parent / "brand_photo.jpg"
     if photo_path.exists():
         with Image.open(photo_path) as source:
@@ -164,6 +172,15 @@ def render(slots: list[dict], path: Path) -> None:
     draw.text((540, 1861), "白凝｜美齒計畫  台北師大店", font=serif_font(30), fill=ink, anchor="mm")
     path.parent.mkdir(parents=True, exist_ok=True)
     image.convert("RGB").save(path, quality=94)
+
+
+def render(slots: list[dict], path: Path, day: dt.date | None = None) -> None:
+    if layout_for_day(day or dt.datetime.now(TZ).date()) == "tabletop":
+        from tabletop import render_tabletop
+
+        render_tabletop(slots, path)
+    else:
+        render_classic(slots, path)
 
 
 def music_for_day(day: dt.date) -> Path:

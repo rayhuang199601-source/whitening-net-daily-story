@@ -1,7 +1,9 @@
 import datetime as dt
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
-from story import TZ, choose_slots, music_for_day
+from story import TZ, choose_slots, layout_for_day, music_for_day, render
 
 
 def event(title, date, start, end):
@@ -33,6 +35,20 @@ class SlotRulesTest(unittest.TestCase):
         self.assertEqual([music_for_day(day).name for day in days],
                          ["track_jp_01.mp3", "track_jp_02.mp3", "track_jp_03.mp3",
                           "track_jp_01.mp3", "track_jp_02.mp3", "track_jp_03.mp3"])
+
+    def test_tabletop_and_classic_alternate_from_october_15(self):
+        days = [dt.date(2026, 10, 14) + dt.timedelta(days=offset) for offset in range(6)]
+        self.assertEqual([layout_for_day(day) for day in days],
+                         ["classic", "tabletop", "classic", "tabletop", "classic", "tabletop"])
+
+    def test_tabletop_handles_one_or_two_available_days(self):
+        rows = [{"date": "2026-10-15", "hours": ["14:00"]},
+                {"date": "2026-10-17", "hours": ["17:00", "18:00"]}]
+        with TemporaryDirectory() as directory:
+            for count in (1, 2):
+                output = Path(directory) / f"tabletop-{count}.jpg"
+                render(rows[:count], output, dt.date(2026, 10, 15))
+                self.assertGreater(output.stat().st_size, 100_000)
 
 
 if __name__ == "__main__":

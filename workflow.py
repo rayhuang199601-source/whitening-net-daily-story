@@ -13,7 +13,7 @@ from pathlib import Path
 import requests
 from cryptography.fernet import Fernet
 
-from story import TZ, choose_slots, fetch_events, render, video
+from story import TZ, choose_slots, fetch_events, layout_for_day, render, video
 
 TIMEOUT = 30
 TOKEN_STATE = "state/meta-token.json"
@@ -251,7 +251,7 @@ def prepare() -> None:
         return
     output = Path("out")
     output.mkdir(exist_ok=True)
-    render(slots, output / "story.jpg")
+    render(slots, output / "story.jpg", now.date())
     music = video(output / "story.jpg", output / "story.mp4", now.date())
     content = (output / "story.mp4").read_bytes()
     video_path = f"story/{day}_{hashlib.sha256(content).hexdigest()[:12]}.mp4"
@@ -259,7 +259,8 @@ def prepare() -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(content)
     (output / "manifest.json").write_text(json.dumps({"slots": slots, "path": video_path,
-                                                        "size": len(content), "music": music.name}, ensure_ascii=False))
+                                                        "size": len(content), "music": music.name,
+                                                        "layout": layout_for_day(now.date())}, ensure_ascii=False))
     step_output.write_text("publish=true\n")
 
 
@@ -282,14 +283,17 @@ def publish() -> None:
     # 先記「待查」，中斷後重跑也不會重複發布；失敗需人工查核帳號狀態。
     gh_write(state_path, json.dumps({"status": "pending", "slots": slots, "video": url,
                                      "music": manifest["music"],
+                                     "layout": manifest["layout"],
                                      "supersedes_media_id": supersedes}, ensure_ascii=False).encode(),
              f"Mark White Ning Story pending {day}")
     media_id = publish_story(url)
     gh_write(state_path, json.dumps({"status": "published", "slots": slots, "media_id": media_id,
                                      "music": manifest["music"],
+                                     "layout": manifest["layout"],
                                      "supersedes_media_id": supersedes}, ensure_ascii=False).encode(),
              f"Mark White Ning Story published {day}")
-    notify(f"【白凝限動】{day} 已發布至 @wntw_shida，限動媒體 ID：{media_id}。")
+    layout_name = "桌面版" if manifest["layout"] == "tabletop" else "原版"
+    notify(f"【白凝限動】{day} 已發布{layout_name}至 @wntw_shida，限動媒體 ID：{media_id}。")
 
 
 if __name__ == "__main__":
