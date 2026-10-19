@@ -1,0 +1,55 @@
+name: 白凝每日既有影片限動
+on:
+  schedule:
+    - cron: '40 7 * * *' # 台北時間 15:40 觸發；提早執行時等待至 16:00
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只讀取影片、轉檔並部署預覽，不發布 IG'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: whitening-story-daily
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      META_IG_APP_SECRET: ${{ secrets.META_IG_APP_SECRET }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+      LINE_OWNER_USER_ID: ${{ secrets.LINE_OWNER_USER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pip install -r requirements.txt
+      - id: prepare
+        name: Choose and prepare an existing Instagram video
+        run: python video_story.py prepare
+      - if: steps.prepare.outputs.publish == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        if: steps.prepare.outputs.publish == 'true'
+        uses: actions/deploy-pages@v4
+      - name: Publish directly playing Instagram Story
+        if: steps.prepare.outputs.publish == 'true' && !inputs.dry_run
+        env:
+          PAGES_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: python video_story.py publish
