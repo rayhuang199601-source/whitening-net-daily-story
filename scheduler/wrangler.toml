@@ -1,0 +1,6 @@
+name = "whitening-net-story-scheduler"
+main = "worker.mjs"
+compatibility_date = "2026-10-20"
+
+[triggers]
+crons = ["58 0 * * *", "58 7 * * *"]

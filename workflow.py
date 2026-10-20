@@ -228,7 +228,7 @@ def prepare() -> None:
         step_output.parent.mkdir(parents=True, exist_ok=True)
         step_output.write_text("publish=false\n")
         return
-    if os.getenv("GITHUB_EVENT_NAME") == "schedule":
+    if os.getenv("GITHUB_EVENT_NAME") == "schedule" or os.getenv("SCHEDULED_DISPATCH") == "true":
         target = dt.datetime.combine(dt.datetime.now(TZ).date(), dt.time(9), TZ)
         wait = (target - dt.datetime.now(TZ)).total_seconds()
         if 0 < wait <= 900:

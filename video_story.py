@@ -136,7 +136,7 @@ def encode_story(source: Path, dest: Path) -> None:
 
 
 def target_time() -> None:
-    if os.getenv("GITHUB_EVENT_NAME") == "schedule":
+    if os.getenv("GITHUB_EVENT_NAME") == "schedule" or os.getenv("SCHEDULED_DISPATCH") == "true":
         target = dt.datetime.combine(dt.datetime.now(TZ).date(), dt.time(16), TZ)
         seconds = (target - dt.datetime.now(TZ)).total_seconds()
         if 0 < seconds <= 1200:

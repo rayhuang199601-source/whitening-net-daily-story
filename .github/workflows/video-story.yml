@@ -8,6 +8,10 @@ on:
         description: '只讀取影片、轉檔並部署預覽，不發布 IG'
         type: boolean
         default: true
+      scheduled_dispatch:
+        description: '外部雲端排程觸發；提早啟動時等待至 16:00'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,6 +33,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       META_IG_APP_SECRET: ${{ secrets.META_IG_APP_SECRET }}
       DRY_RUN: ${{ inputs.dry_run }}
+      SCHEDULED_DISPATCH: ${{ inputs.scheduled_dispatch }}
       LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
       LINE_OWNER_USER_ID: ${{ secrets.LINE_OWNER_USER_ID }}
     steps:

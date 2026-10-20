@@ -16,6 +16,10 @@ on:
         description: '確認舊限動已刪除後，允許手動重發今日限動'
         type: boolean
         default: false
+      scheduled_dispatch:
+        description: '外部雲端排程觸發；提早啟動時等待至 09:00'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,6 +47,7 @@ jobs:
       DRY_RUN: ${{ inputs.dry_run }}
       BOOTSTRAP_ONLY: ${{ inputs.bootstrap_only }}
       FORCE_REPOST: ${{ inputs.force_repost }}
+      SCHEDULED_DISPATCH: ${{ inputs.scheduled_dispatch }}
       LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
       LINE_OWNER_USER_ID: ${{ secrets.LINE_OWNER_USER_ID }}
     steps:
