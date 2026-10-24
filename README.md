@@ -10,7 +10,7 @@
 
 自 2026-10-25 起，台北時間每日 12:00 發布一張齒色前後對比限動。8 張依日期輪播，10/25 發第 1 張、10/26 發第 2 張，第 8 張後回到第 1 張；同日有發布或待查紀錄時不重複發布。每張轉成 8 秒影片，沿用三首已核准的日系純音樂輪播。
 
-原圖只保存在白凝事業部工作資料夾；公開儲存庫的 `assets/ba_story/` 僅保存加密圖片。GitHub Actions 以 `BA_IMAGE_KEY` Secret 解密當日圖片後，透過 Pages 公開影片供 Instagram 讀取。影片會留在 Pages，直到下一次成功部署替換。不要提交 `.env` 或解密後的圖片。限動畫面會引導觀眾到 IG 個人檔案的官方 LINE 連結；自動發布無法加入可點擊的 IG 原生連結貼圖。
+原圖只保存在白凝事業部工作資料夾；公開儲存庫的 `assets/ba_story/` 僅保存加密圖片。GitHub Actions 以 `BA_IMAGE_KEY` Secret 解密當日圖片後，透過 Pages 公開影片供 Instagram 讀取。影片會留在 Pages，直到下一次成功部署替換。不要提交 `.env` 或解密後的圖片。齒色對比限動圖片不呈現私訊、預約或官方 LINE 的 CTA；自動發布流程也不加入可點擊貼圖。
 
 正式排程：`.github/workflows/ba-story.yml` 的 GitHub cron 在台北 11:50 觸發，程式在提早開始時等到 12:00；製片、部署和 Meta 處理仍需時間，因此實際上線約在中午。`scheduler/` 的 Cloudflare cron 在台北 11:58 觸發同一個 workflow，以降低 GitHub 原生排程的延誤。兩者共用防重複發布檢查。首次啟用前，需確認 `BA_IMAGE_KEY` Secret、Cloudflare 的 GitHub dispatch Secret 與三組 cron 已設定。乾跑會驗證解密、製片、Pages 公開網址，但不發布 IG。
 
