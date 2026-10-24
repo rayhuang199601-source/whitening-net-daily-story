@@ -5,7 +5,7 @@ import { dispatch } from './worker.mjs';
 for (const [cron, expected] of [
   ['58 0 * * *', 'daily-story.yml'],
   ['58 3 * * *', 'ba-story.yml'],
-  ['58 7 * * *', 'video-story.yml'],
+  ['0 8 * * *', 'video-story.yml'],
 ]) {
   test(`dispatches ${expected} with safe inputs`, async () => {
     let request;
