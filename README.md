@@ -26,6 +26,6 @@
 
 ## 準點排程（待 Cloudflare 帳號設定）
 
-GitHub 的原生 `schedule` 在 2026-10-18 至 10-20 三天把早上 08:50 的工作延到台北時間約 13:10–13:22 才開始。`scheduler/` 已備妥 Cloudflare Worker Cron：UTC 00:58、03:58 與 07:58 分別觸發早上時段、齒色對比、下午影片限動。Worker 呼叫 GitHub 的 `workflow_dispatch`，影片渲染與 IG 發布仍在既有 GitHub Actions 內執行。提早開始的工作會等到台北時間 09:00、12:00 或 16:00。GitHub 原生排程保留備援；各類限動由每日狀態檔防止重複發布，公開影片網址與檔案大小會在 Meta 發布前再次核對。
+GitHub 的原生 `schedule` 在 2026-10-18 至 10-20 三天把早上 08:50 的工作延到台北時間約 13:10–13:22 才開始。Cloudflare Worker Cron 在 UTC 00:58、03:58 與 08:00 分別觸發早上時段、齒色對比、下午影片限動。Worker 呼叫 GitHub 的 `workflow_dispatch`，影片渲染與 IG 發布仍在既有 GitHub Actions 內執行。提早開始的工作會等到台北時間 09:00、12:00 或 16:00。GitHub 原生排程保留備援；各類限動由每日狀態檔防止重複發布，公開影片網址與檔案大小會在 Meta 發布前再次核對。
 
 啟用需在 Cloudflare 帳號部署 `scheduler/wrangler.toml` 與 `worker.mjs`，並把僅限此儲存庫、Repository `Actions: write` 的 GitHub fine-grained token 設為 Worker Secret `GITHUB_DISPATCH_TOKEN`。不要把 token 寫進程式、儲存庫或聊天。部署後先以測試方式確認三個 `workflow_dispatch` 都能啟動，接著驗證首次正式排程及 IG 狀態。Cloudflare Cron 也不保證精確到秒；此配置的目的在降低 GitHub 原生排程出現的數小時延遲。
