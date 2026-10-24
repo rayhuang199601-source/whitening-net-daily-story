@@ -2,7 +2,7 @@
 export const JOBS = Object.freeze({
   '58 0 * * *': 'daily-story.yml', // 08:58 Asia/Taipei
   '58 3 * * *': 'ba-story.yml', // 11:58 Asia/Taipei
-  '58 7 * * *': 'video-story.yml', // 15:58 Asia/Taipei
+  '0 8 * * *': 'video-story.yml', // 16:00 Asia/Taipei
 });
 
 export async function dispatch(cron, token, fetcher = fetch) {
@@ -20,7 +20,7 @@ export async function dispatch(cron, token, fetcher = fetch) {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
       'User-Agent': 'whitening-net-cloud-scheduler',
-      'X-GitHub-Api-Version': '2026-03-10',
+      'X-GitHub-Api-Version': '2022-11-28',
     },
     body: JSON.stringify({ ref: 'main', inputs }),
   });
