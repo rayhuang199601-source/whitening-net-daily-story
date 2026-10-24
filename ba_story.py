@@ -1,4 +1,4 @@
-"""每日輪播一張加密保存的白凝齒色對比限動；首發為 2026-10-24 中午。"""
+"""每日輪播一張加密保存的白凝齒色對比限動；首發為 2026-10-25 中午。"""
 from __future__ import annotations
 
 import datetime as dt
@@ -18,7 +18,7 @@ from story import TZ, video
 from workflow import (gh_file, gh_write, notify, public_video_url, publish_story,
                       refresh_meta_token, required)
 
-START_DAY = dt.date(2026, 10, 24)
+START_DAY = dt.date(2026, 10, 25)
 STORY_COUNT = 8
 ASSET_DIR = Path(__file__).parent / "assets" / "ba_story"
 
