@@ -3,3 +3,5 @@ out/
 site/
 calendar-key.json
 *.pyc
+.env
+.env.*
