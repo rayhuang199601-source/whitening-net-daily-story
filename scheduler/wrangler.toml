@@ -3,4 +3,4 @@ main = "worker.mjs"
 compatibility_date = "2026-10-20"
 
 [triggers]
-crons = ["58 0 * * *", "58 3 * * *", "58 7 * * *"]
+crons = ["58 0 * * *", "58 3 * * *", "0 8 * * *"]
