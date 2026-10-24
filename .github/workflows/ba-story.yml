@@ -1,0 +1,78 @@
+name: 白凝每日齒色對比限動
+on:
+  schedule:
+    - cron: '50 3 * * *' # 台北時間 11:50 觸發，程式等待至 12:00
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只驗證解密、影片和 Pages，不發布 IG'
+        type: boolean
+        default: true
+      scheduled_dispatch:
+        description: '外部雲端排程觸發；提早啟動時等待至 12:00'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: whitening-story-ba
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      META_IG_APP_SECRET: ${{ secrets.META_IG_APP_SECRET }}
+      BA_IMAGE_KEY: ${{ secrets.BA_IMAGE_KEY }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      SCHEDULED_DISPATCH: ${{ inputs.scheduled_dispatch }}
+      LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+      LINE_OWNER_USER_ID: ${{ secrets.LINE_OWNER_USER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pip install -r requirements.txt
+      - id: prepare
+        name: Prepare today's encrypted BA Story
+        run: python ba_story.py prepare
+      - if: steps.prepare.outputs.publish == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        if: steps.prepare.outputs.publish == 'true'
+        uses: actions/deploy-pages@v4
+      - name: Verify public BA video
+        if: steps.prepare.outputs.publish == 'true'
+        env:
+          PAGES_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: python ba_story.py verify
+      - name: Publish Instagram Story
+        if: steps.prepare.outputs.publish == 'true' && !inputs.dry_run
+        env:
+          PAGES_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: python ba_story.py publish
+      - name: Notify owner if workflow fails
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          token = os.getenv('LINE_CHANNEL_TOKEN')
+          owner = os.getenv('LINE_OWNER_USER_ID')
+          if token and owner:
+              payload = json.dumps({'to': owner, 'messages': [{'type': 'text', 'text': '【白凝 BA 限動】GitHub Actions 工作失敗，今日可能未發布；請檢查執行紀錄。'}]}).encode()
+              request = urllib.request.Request('https://api.line.me/v2/bot/message/push', data=payload, headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+              urllib.request.urlopen(request, timeout=20).read()
+          PY

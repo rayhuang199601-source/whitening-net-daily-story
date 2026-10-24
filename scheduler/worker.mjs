@@ -1,6 +1,7 @@
-/** Cloudflare cron trigger for the two existing GitHub Actions workflows. */
+/** Cloudflare cron trigger for the three Instagram Story workflows. */
 export const JOBS = Object.freeze({
   '58 0 * * *': 'daily-story.yml', // 08:58 Asia/Taipei
+  '58 3 * * *': 'ba-story.yml', // 11:58 Asia/Taipei
   '58 7 * * *': 'video-story.yml', // 15:58 Asia/Taipei
 });
 
@@ -9,7 +10,7 @@ export async function dispatch(cron, token, fetcher = fetch) {
   if (!workflow) throw new Error(`Unknown cron: ${cron}`);
   if (!token) throw new Error('Missing GITHUB_DISPATCH_TOKEN');
   const url = `https://api.github.com/repos/rayhuang199601-source/whitening-net-daily-story/actions/workflows/${workflow}/dispatches`;
-  const inputs = workflow === 'video-story.yml'
+  const inputs = workflow === 'video-story.yml' || workflow === 'ba-story.yml'
     ? { dry_run: false, scheduled_dispatch: true }
     : { scheduled_dispatch: true };
   const response = await fetcher(url, {

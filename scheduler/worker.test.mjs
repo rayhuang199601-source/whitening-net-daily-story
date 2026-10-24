@@ -4,6 +4,7 @@ import { dispatch } from './worker.mjs';
 
 for (const [cron, expected] of [
   ['58 0 * * *', 'daily-story.yml'],
+  ['58 3 * * *', 'ba-story.yml'],
   ['58 7 * * *', 'video-story.yml'],
 ]) {
   test(`dispatches ${expected} with safe inputs`, async () => {
@@ -18,7 +19,7 @@ for (const [cron, expected] of [
     const body = JSON.parse(request.options.body);
     assert.equal(body.ref, 'main');
     assert.equal(body.inputs.scheduled_dispatch, true);
-    if (expected === 'video-story.yml') assert.equal(body.inputs.dry_run, false);
+    if (expected === 'video-story.yml' || expected === 'ba-story.yml') assert.equal(body.inputs.dry_run, false);
   });
 }
 
