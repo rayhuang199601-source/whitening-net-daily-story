@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import base64
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ import sys
 import time
 from pathlib import Path
 
+import requests
 from cryptography.fernet import Fernet, InvalidToken
 from PIL import Image
 
@@ -29,6 +31,23 @@ def index_for(day: dt.date) -> int:
 
 def state_path(day: dt.date) -> str:
     return f"state/ba-story-{day.isoformat()}.json"
+
+
+def claim_day(path: str, data: dict, today: dt.date) -> bool:
+    """只建立新狀態檔；既有檔案不能被另一個排程覆寫。"""
+    repo = required("GITHUB_REPOSITORY")
+    branch = os.getenv("GH_STATE_BRANCH", "main")
+    response = requests.put(
+        f"https://api.github.com/repos/{repo}/contents/{path}",
+        headers={"Authorization": f"Bearer {required('GITHUB_TOKEN')}",
+                 "Accept": "application/vnd.github+json"},
+        json={"message": f"Mark BA Story pending {today}",
+              "content": base64.b64encode(json.dumps(data, ensure_ascii=False).encode()).decode(),
+              "branch": branch}, timeout=60)
+    if response.status_code in (409, 422) and gh_file(path):
+        return False
+    response.raise_for_status()
+    return True
 
 
 def output_flag(publish: bool) -> None:
@@ -100,12 +119,14 @@ def publish() -> None:
         raise RuntimeError("BA 限動日期或輪播順序已變，停止發布")
     path = state_path(today)
     if gh_file(path):
-        raise RuntimeError("今日 BA 限動已有紀錄，停止重複發布")
+        print("今日 BA 限動已有紀錄，略過重複發布")
+        return
     url = public_video_url(manifest["path"], manifest["size"])
     pending = {"status": "pending", "index": manifest["index"],
                "video": url, "music": manifest["music"]}
-    gh_write(path, json.dumps(pending, ensure_ascii=False).encode(),
-             f"Mark BA Story pending {today}")
+    if not claim_day(path, pending, today):
+        print("另一個排程已先取得今日發布權，略過")
+        return
     media_id = publish_story(url)
     published = {**pending, "status": "published", "media_id": media_id}
     gh_write(path, json.dumps(published, ensure_ascii=False).encode(),
