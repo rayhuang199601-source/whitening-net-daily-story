@@ -1,4 +1,4 @@
-"""每日輪播一張加密保存的白凝齒色對比限動；首發為 2026-10-25 中午。"""
+"""每日交錯輪播兩批加密齒色對比限動；首發為 2026-10-25 中午。"""
 from __future__ import annotations
 
 import datetime as dt
@@ -19,14 +19,16 @@ from workflow import (gh_file, gh_write, notify, public_video_url, publish_story
                       refresh_meta_token, required)
 
 START_DAY = dt.date(2026, 10, 25)
-STORY_COUNT = 8
+STORY_COUNT = 16
 ASSET_DIR = Path(__file__).parent / "assets" / "ba_story"
 
 
 def index_for(day: dt.date) -> int:
     if day < START_DAY:
         raise ValueError("BA 輪播尚未開始")
-    return (day - START_DAY).days % STORY_COUNT + 1
+    position = (day - START_DAY).days % STORY_COUNT
+    # 10/25 舊第 1 張、10/26 新第 1 張，之後逐日交錯。
+    return position // 2 + (1 if position % 2 == 0 else 9)
 
 
 def state_path(day: dt.date) -> str:
