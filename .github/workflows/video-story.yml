@@ -32,6 +32,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       META_IG_APP_SECRET: ${{ secrets.META_IG_APP_SECRET }}
+      META_COLLAB_TOKEN: ${{ secrets.META_COLLAB_TOKEN }}
       DRY_RUN: ${{ inputs.dry_run }}
       SCHEDULED_DISPATCH: ${{ inputs.scheduled_dispatch }}
       LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
