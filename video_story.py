@@ -126,10 +126,10 @@ def ordered_candidates(videos: list[dict], rotation: dict, rng: random.Random | 
     for group in (unused_collabs, unused_own, used_collabs, used_own):
         rng.shuffle(group)
     last = rotation.get("last_id")
-    if len(videos) > 1:
-        used_collabs.sort(key=lambda v: v["id"] == last)
-        used_own.sort(key=lambda v: v["id"] == last)
-    return unused_collabs + unused_own + used_collabs + used_own
+    ordered = unused_collabs + unused_own + used_collabs + used_own
+    if len(ordered) > 1 and last:
+        ordered.sort(key=lambda v: v["id"] == last)
+    return ordered
 
 
 def allowed_video_url(url: str) -> bool:
@@ -197,27 +197,31 @@ def prepare() -> None:
         print("今日影片限動已有發布或待查紀錄，避免重複發布")
         step_output.write_text("publish=false\n")
         return
-    videos = list_videos(account_id())
+    videos: list[dict] = []
     collab_token = os.getenv("META_COLLAB_TOKEN")
     if collab_token:
         try:
-            collabs = list_collaborative_reels(collab_token)
-            own_ids = {item["id"] for item in videos}
-            videos = [item for item in collabs if item["id"] not in own_ids] + videos
-            print(f"可用的網紅協作 Reels：{len(collabs)} 支")
+            videos = list_collaborative_reels(collab_token)
+            print(f"可用的網紅協作 Reels：{len(videos)} 支")
         except (requests.RequestException, ValueError, RuntimeError) as error:
             print(f"協作 Reels 讀取失敗：{type(error).__name__}")
             notify(f"【白凝影片限動】{day} 協作 Reels 暫時無法讀取，今日改用自有影片。請檢查 Meta 協作授權。")
+    try:
+        own = list_videos(account_id())
+        collab_ids = {item["id"] for item in videos}
+        videos += [item for item in own if item["id"] not in collab_ids]
+    except (requests.RequestException, ValueError, RuntimeError) as error:
+        print(f"自有影片讀取失敗：{type(error).__name__}")
+        if videos:
+            notify(f"【白凝影片限動】{day} 自有影片暫時無法讀取，今日改用協作 Reels。")
+        else:
+            raise
     candidates = ordered_candidates(videos, rotation)
     if not candidates:
         notify(f"【白凝影片限動】{day} 帳號沒有官方 API 可讀取的影片，今日不發布。")
         step_output.write_text("publish=false\n")
         return
-    seen = set(rotation.get("used_ids", []))
-    transient_unplayed_failure = False
     for item in candidates:
-        if item["id"] in seen and transient_unplayed_failure:
-            break
         source = output / "source.mp4"
         try:
             download_video(item["media_url"], source)
@@ -241,8 +245,6 @@ def prepare() -> None:
             return
         except (requests.RequestException, subprocess.SubprocessError, OSError) as error:
             print(f"略過影片 {item['id']}：{type(error).__name__}")
-            if item["id"] not in seen:
-                transient_unplayed_failure = True
         except ValueError as error:
             print(f"略過影片 {item['id']}：{type(error).__name__}")
         finally:

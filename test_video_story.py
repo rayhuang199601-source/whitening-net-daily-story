@@ -40,6 +40,12 @@ class VideoStoryTests(unittest.TestCase):
         result = module.ordered_candidates(videos, {"used_ids": ["2"]}, random.Random(3))
         self.assertEqual([v["id"] for v in result], ["3", "1", "2"])
 
+    def test_last_collaboration_does_not_repeat_when_other_video_exists(self):
+        videos = [{"id": "1", "source_kind": "collaboration"}, {"id": "2"}]
+        result = module.ordered_candidates(videos,
+            {"used_ids": ["1", "2"], "last_id": "1"}, random.Random(3))
+        self.assertEqual([v["id"] for v in result], ["2", "1"])
+
     def test_collaboration_list_skips_media_without_reusable_video(self):
         page = {"instagram_business_account": {"id": "123", "username": "wntw_shida"}}
         media = {"data": [
