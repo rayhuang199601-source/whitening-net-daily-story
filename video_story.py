@@ -1,4 +1,4 @@
-"""Select one of our own Instagram videos and publish it as a directly playing Story."""
+"""Select an authorized Instagram Reel and publish it as a directly playing Story."""
 from __future__ import annotations
 
 import base64
@@ -19,6 +19,8 @@ from story import TZ
 from workflow import TOKEN_STATE, gh_file, gh_write, graph, notify, public_video_url, publish_story
 
 ROTATION = "state/video-story-rotation.json"
+COLLAB_PAGE_ID = "670178586181279"  # Whitening Net 台北師大店
+COLLAB_GRAPH = "https://graph.facebook.com/v26.0"
 MAX_SOURCE_BYTES = 100 * 1024 * 1024
 MAX_DURATION = 60.0
 
@@ -78,18 +80,56 @@ def list_videos(user_id: str) -> list[dict]:
     return videos
 
 
+def facebook_get(path: str, token: str, params: dict | None = None) -> dict:
+    """Keep the Facebook Login token out of URLs and exception messages."""
+    response = requests.get(f"{COLLAB_GRAPH}/{path}",
+        headers={"Authorization": f"Bearer {token}"}, params=params or {}, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+
+def list_collaborative_reels(token: str) -> list[dict]:
+    """Read accepted, creator-owned collaborations through Facebook Login."""
+    page = facebook_get(COLLAB_PAGE_ID, token,
+        {"fields": "instagram_business_account{id,username}"})
+    account = page.get("instagram_business_account") or {}
+    if account.get("username") != "wntw_shida" or not str(account.get("id", "")).isdigit():
+        raise RuntimeError("協作權杖未連到 @wntw_shida，停止讀取")
+    videos: list[dict] = []
+    after = None
+    for _ in range(10):
+        params = {"fields": "id,media_type,media_product_type,media_url,permalink,timestamp,username",
+            "limit": 100}
+        if after:
+            params["after"] = after
+        result = facebook_get(f"{account['id']}/collaborative_media", token, params)
+        for item in result.get("data", []):
+            is_reel = item.get("media_product_type") == "REELS" or "/reel/" in item.get("permalink", "")
+            if item.get("media_type") == "VIDEO" and is_reel and item.get("media_url") \
+                    and str(item.get("id", "")).isdigit():
+                videos.append({**item, "source_kind": "collaboration"})
+        new_after = result.get("paging", {}).get("cursors", {}).get("after")
+        if not result.get("paging", {}).get("next") or not new_after or new_after == after:
+            break
+        after = new_after
+    return videos
+
+
 def ordered_candidates(videos: list[dict], rotation: dict, rng: random.Random | None = None) -> list[dict]:
-    """Shuffle unused videos first; defer the last video when beginning a new cycle."""
+    """Favor unused creator collaborations, then unused self-owned videos."""
     rng = rng or random.SystemRandom()
     seen = set(rotation.get("used_ids", []))
-    unused = [v for v in videos if v["id"] not in seen]
-    used = [v for v in videos if v["id"] in seen]
-    rng.shuffle(unused)
-    rng.shuffle(used)
+    unused_collabs = [v for v in videos if v["id"] not in seen and v.get("source_kind") == "collaboration"]
+    unused_own = [v for v in videos if v["id"] not in seen and v.get("source_kind") != "collaboration"]
+    used_collabs = [v for v in videos if v["id"] in seen and v.get("source_kind") == "collaboration"]
+    used_own = [v for v in videos if v["id"] in seen and v.get("source_kind") != "collaboration"]
+    for group in (unused_collabs, unused_own, used_collabs, used_own):
+        rng.shuffle(group)
     last = rotation.get("last_id")
-    if len(videos) > 1:
-        used.sort(key=lambda v: v["id"] == last)
-    return unused + used
+    ordered = unused_collabs + unused_own + used_collabs + used_own
+    if len(ordered) > 1 and last:
+        ordered.sort(key=lambda v: v["id"] == last)
+    return ordered
 
 
 def allowed_video_url(url: str) -> bool:
@@ -157,17 +197,31 @@ def prepare() -> None:
         print("今日影片限動已有發布或待查紀錄，避免重複發布")
         step_output.write_text("publish=false\n")
         return
-    videos = list_videos(account_id())
+    videos: list[dict] = []
+    collab_token = os.getenv("META_COLLAB_TOKEN")
+    if collab_token:
+        try:
+            videos = list_collaborative_reels(collab_token)
+            print(f"可用的網紅協作 Reels：{len(videos)} 支")
+        except (requests.RequestException, ValueError, RuntimeError) as error:
+            print(f"協作 Reels 讀取失敗：{type(error).__name__}")
+            notify(f"【白凝影片限動】{day} 協作 Reels 暫時無法讀取，今日改用自有影片。請檢查 Meta 協作授權。")
+    try:
+        own = list_videos(account_id())
+        collab_ids = {item["id"] for item in videos}
+        videos += [item for item in own if item["id"] not in collab_ids]
+    except (requests.RequestException, ValueError, RuntimeError) as error:
+        print(f"自有影片讀取失敗：{type(error).__name__}")
+        if videos:
+            notify(f"【白凝影片限動】{day} 自有影片暫時無法讀取，今日改用協作 Reels。")
+        else:
+            raise
     candidates = ordered_candidates(videos, rotation)
     if not candidates:
         notify(f"【白凝影片限動】{day} 帳號沒有官方 API 可讀取的影片，今日不發布。")
         step_output.write_text("publish=false\n")
         return
-    seen = set(rotation.get("used_ids", []))
-    transient_unplayed_failure = False
     for item in candidates:
-        if item["id"] in seen and transient_unplayed_failure:
-            break
         source = output / "source.mp4"
         try:
             download_video(item["media_url"], source)
@@ -184,14 +238,13 @@ def prepare() -> None:
             page_file.write_bytes(content)
             (output / "video-manifest.json").write_text(json.dumps({"source_id": item["id"],
                 "source_permalink": item.get("permalink", ""), "path": video_path,
-                "size": len(content), "date": day, "available_ids": [v["id"] for v in videos]}, ensure_ascii=False))
+                "size": len(content), "date": day, "source_kind": item.get("source_kind", "own"),
+                "available_ids": [v["id"] for v in videos]}, ensure_ascii=False))
             step_output.write_text("publish=true\n")
             print(f"已準備影片 {item['id']}，長度 {seconds:.1f} 秒")
             return
         except (requests.RequestException, subprocess.SubprocessError, OSError) as error:
             print(f"略過影片 {item['id']}：{type(error).__name__}")
-            if item["id"] not in seen:
-                transient_unplayed_failure = True
         except ValueError as error:
             print(f"略過影片 {item['id']}：{type(error).__name__}")
         finally:
@@ -210,19 +263,21 @@ def publish() -> None:
         raise RuntimeError("今日影片限動已有發布或待查紀錄")
     url = public_video_url(manifest["path"], manifest["size"])
     gh_write(state_path, json.dumps({"status": "pending", "source_id": manifest["source_id"],
-        "source_permalink": manifest["source_permalink"],
+        "source_permalink": manifest["source_permalink"], "source_kind": manifest.get("source_kind", "own"),
         "available_ids": manifest["available_ids"]}, ensure_ascii=False).encode(),
         f"Mark video Story pending {day}")
     media_id = publish_story(url)
     gh_write(state_path, json.dumps({"status": "published", "source_id": manifest["source_id"],
-        "source_permalink": manifest["source_permalink"], "media_id": media_id,
+        "source_permalink": manifest["source_permalink"], "source_kind": manifest.get("source_kind", "own"),
+        "media_id": media_id,
         "available_ids": manifest["available_ids"]}, ensure_ascii=False).encode(),
         f"Mark video Story published {day}")
     rotation = json_file(ROTATION) or {}
     rotation = update_rotation(rotation, manifest["source_id"], manifest["available_ids"], day)
     gh_write(ROTATION, json.dumps(rotation, ensure_ascii=False).encode(),
         f"Rotate video Story {day}")
-    notify(f"【白凝影片限動】{day} 已將既有影片發布為直接播放的限動：{manifest['source_permalink']}")
+    source_label = "網紅協作 Reel" if manifest.get("source_kind") == "collaboration" else "既有影片"
+    notify(f"【白凝影片限動】{day} 已將{source_label}發布為直接播放的限動：{manifest['source_permalink']}")
 
 
 if __name__ == "__main__":
